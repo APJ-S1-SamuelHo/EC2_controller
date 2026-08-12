@@ -461,8 +461,12 @@
   <div class="modal">
     <h3>🔗 Add Application Link</h3>
     <div class="field"><label>App Name</label><input id="ap-name" placeholder="Prompt Security"/></div>
-    <div class="field"><label>URL</label><input id="ap-url" placeholder="http://1.2.3.4:8501" style="font-family:var(--font-mono)"/></div>
+    <div class="field"><label>Public IP</label><input id="ap-ip" style="font-family:var(--font-mono)" placeholder="Auto-filled from instance"/></div>
+    <div class="field"><label>Port</label><input id="ap-port" type="number" placeholder="e.g. 8501" min="1" max="65535" style="font-family:var(--font-mono)"/></div>
     <div class="field"><label>Icon (emoji)</label><input id="ap-icon" placeholder="🛡️" maxlength="4"/></div>
+    <div style="font-size:.78rem;color:var(--muted);margin-bottom:.75rem;">
+      URL preview: <span id="ap-url-preview" style="font-family:var(--font-mono);color:var(--accent)">—</span>
+    </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModal('modal-add-app')">Cancel</button>
       <button class="btn-submit" onclick="submitAddApp()">Add App</button>
@@ -508,6 +512,7 @@ let instances      = [];
 let selectedInstId = null; // db id
 let schedulerPoll  = null;
 let instPoll       = null;
+let currentPublicIp = null;
 
 // ── Toast ────────────────────────────────────────────────────────────────
 function toast(msg, type = 'success') {
@@ -637,6 +642,7 @@ function renderInstance(d) {
   document.getElementById('inst-privip').textContent = d.privateIp || '—';
   document.getElementById('inst-type').textContent   = d.instanceType || '—';
   document.getElementById('inst-launch').textContent = d.launchTime ? new Date(d.launchTime).toLocaleString() : '—';
+  currentPublicIp = d.publicIp || null;
   document.getElementById('inst-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
 
   const state = d.state || 'unknown';
@@ -727,13 +733,35 @@ async function loadApps() {
   `).join('');
 }
 
-function openAddApp() { openModal('modal-add-app'); }
+function updateAppUrlPreview() {
+  const ip   = document.getElementById('ap-ip').value.trim();
+  const port = document.getElementById('ap-port').value.trim();
+  const prev = document.getElementById('ap-url-preview');
+  prev.textContent = ip && port ? `http://${ip}:${port}` : '—';
+}
+
+function openAddApp() {
+  document.getElementById('ap-ip').value   = currentPublicIp || '';
+  document.getElementById('ap-port').value = '';
+  document.getElementById('ap-name').value = '';
+  document.getElementById('ap-icon').value = '';
+  updateAppUrlPreview();
+  openModal('modal-add-app');
+}
+
+// Live preview as user types
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('ap-ip').addEventListener('input', updateAppUrlPreview);
+  document.getElementById('ap-port').addEventListener('input', updateAppUrlPreview);
+});
 
 async function submitAddApp() {
   const name = document.getElementById('ap-name').value.trim();
-  const url  = document.getElementById('ap-url').value.trim();
+  const ip   = document.getElementById('ap-ip').value.trim();
+  const port = document.getElementById('ap-port').value.trim();
   const icon = document.getElementById('ap-icon').value.trim() || '🔗';
-  if (!name || !url) { toast('Name and URL required', 'error'); return; }
+  if (!name || !ip || !port) { toast('Name, IP and Port required', 'error'); return; }
+  const url = `http://${ip}:${port}`;
   const r = await fetch(`/api/instances/${selectedInstId}/apps`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ name, url, icon })
@@ -742,7 +770,7 @@ async function submitAddApp() {
   if (!r.ok) { toast(d.error, 'error'); return; }
   closeModal('modal-add-app');
   document.getElementById('ap-name').value = '';
-  document.getElementById('ap-url').value = '';
+  document.getElementById('ap-port').value = '';
   document.getElementById('ap-icon').value = '';
   toast('App added');
   loadApps();
