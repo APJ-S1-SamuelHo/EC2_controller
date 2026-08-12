@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EC2 Control Panel</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0b0b12;
+    --surface:   #12121e;
+    --card:      #181827;
+    --border:    #252540;
+    --border2:   #1e1e35;
+    --text:      #e2e2f0;
+    --muted:     #6b6b90;
+    --accent:    #00d4ff;
+    --accent2:   #7c3aed;
+    --green:     #22c55e;
+    --red:       #ef4444;
+    --yellow:    #f59e0b;
+    --blue:      #3b82f6;
+    --font-mono: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  /* ── Login ── */
+  #login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .login-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 2.5rem 2rem; width: 100%; max-width: 400px;
+  }
+  .login-logo { display: flex; align-items: center; gap: .75rem; margin-bottom: 2rem; }
+  .logo-icon {
+    width: 48px; height: 48px; border-radius: 12px;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+  .logo-text h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .logo-text p  { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .login-box h2 { font-size: 1.25rem; margin-bottom: .4rem; }
+  .login-box p.sub { color: var(--muted); font-size: .85rem; margin-bottom: 1.75rem; }
+  .field { margin-bottom: 1rem; }
+  .field label { display: block; font-size: .78rem; color: var(--muted); margin-bottom: .4rem; letter-spacing: .05em; text-transform: uppercase; }
+  .field input, .field select {
+    width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); padding: .65rem .85rem; font-size: .9rem; outline: none;
+    transition: border-color .2s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .btn-primary {
+    width: 100%; background: linear-gradient(135deg, #2563eb, #7c3aed); border: none;
+    border-radius: 8px; color: #fff; font-size: .9rem; font-weight: 600;
+    padding: .75rem; cursor: pointer; margin-top: .5rem; transition: opacity .2s;
+  }
+  .btn-primary:hover { opacity: .85; }
+  .login-error { color: var(--red); font-size: .82rem; margin-top: .75rem; text-align: center; }
+
+  /* ── App shell ── */
+  #app { display: none; min-height: 100vh; }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 2rem; border-bottom: 1px solid var(--border);
+  }
+  .header-logo { display: flex; align-items: center; gap: .75rem; }
+  .logo-icon-sm {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .header-right { display: flex; align-items: center; gap: 1rem; }
+  .user-pill {
+    display: flex; align-items: center; gap: .5rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: .4rem .85rem; font-size: .85rem;
+  }
+  .user-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  .btn-logout {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--muted); padding: .4rem .85rem; font-size: .82rem; cursor: pointer;
+    transition: border-color .2s, color .2s;
+  }
+  .btn-logout:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Tab bar */
+  nav {
+    display: flex; gap: .5rem; padding: 1rem 2rem;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: .5rem;
+    padding: .7rem; border-radius: 10px; border: 1px solid transparent;
+    font-size: .82rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    cursor: pointer; color: var(--muted); background: transparent; transition: all .2s;
+  }
+  .tab.active {
+    background: var(--card); border-color: var(--border);
+    color: var(--text); box-shadow: 0 0 0 1px var(--accent) inset;
+  }
+  .tab:hover:not(.active) { background: var(--card); color: var(--text); }
+
+  /* Main content */
+  main { padding: 1.5rem 2rem; max-width: 900px; margin: 0 auto; }
+
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1.5rem; margin-bottom: 1.25rem;
+  }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+  .card-title { font-size: 1.05rem; font-weight: 600; display: flex; align-items: center; gap: .5rem; }
+
+  /* Status badge */
+  .badge {
+    padding: .3rem .85rem; border-radius: 20px; font-size: .72rem;
+    font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .badge-running  { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+  .badge-stopped  { background: rgba(239,68,68,.12); color: var(--red);   border: 1px solid rgba(239,68,68,.3); }
+  .badge-pending  { background: rgba(245,158,11,.12); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+  .badge-loading  { background: rgba(107,107,144,.12); color: var(--muted); border: 1px solid var(--border); }
+  .badge-admin    { background: rgba(0,212,255,.1); color: var(--accent); border: 1px solid rgba(0,212,255,.3); }
+  .badge-user     { background: var(--card); color: var(--muted); border: 1px solid var(--border); }
+  .badge-enabled  { background: rgba(34,197,94,.12); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+  .badge-disabled { background: var(--card); color: var(--muted); border: 1px solid var(--border); }
+
+  /* Info grid */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: 1.25rem; }
+  .info-cell {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: 10px; padding: .85rem 1rem;
+  }
+  .info-label { font-size: .68rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: .3rem; }
+  .info-value { font-size: .95rem; font-family: var(--font-mono); }
+
+  /* Buttons */
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: 1rem; }
+  .btn-action {
+    padding: .75rem; border-radius: 10px; font-size: .85rem; font-weight: 600;
+    cursor: pointer; border: 1px solid; transition: opacity .2s; display: flex;
+    align-items: center; justify-content: center; gap: .4rem;
+  }
+  .btn-start { background: rgba(34,197,94,.08); border-color: rgba(34,197,94,.25); color: var(--green); }
+  .btn-stop  { background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.25); color: var(--red); }
+  .btn-action:hover:not(:disabled) { opacity: .75; }
+  .btn-action:disabled { opacity: .35; cursor: not-allowed; }
+
+  .btn-sm {
+    padding: .35rem .75rem; border-radius: 7px; font-size: .78rem; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border); background: var(--card);
+    color: var(--text); transition: border-color .2s; white-space: nowrap;
+  }
+  .btn-sm:hover { border-color: var(--accent); }
+  .btn-sm.danger { border-color: rgba(239,68,68,.3); color: var(--red); }
+  .btn-sm.danger:hover { border-color: var(--red); }
+  .btn-sm.accent { background: linear-gradient(135deg,#2563eb,#7c3aed); border-color: transparent; color:#fff; }
+  .btn-sm.green-btn { border-color: rgba(34,197,94,.3); color: var(--green); }
+
+  .refresh-row { display: flex; align-items: center; gap: 1rem; }
+  .btn-refresh {
+    padding: .45rem 1rem; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: .82rem; cursor: pointer;
+    transition: border-color .2s;
+  }
+  .btn-refresh:hover { border-color: var(--accent); }
+  .updated-at { font-size: .78rem; color: var(--muted); margin-left: auto; font-family: var(--font-mono); }
+
+  /* Instance selector */
+  .instance-selector { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.25rem; }
+  .instance-selector select {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); padding: .6rem .85rem;
+    font-size: .88rem; outline: none; cursor: pointer;
+  }
+  .instance-selector select:focus { border-color: var(--accent); }
+
+  /* Applications */
+  .apps-list { display: flex; flex-direction: column; gap: .5rem; }
+  .app-item {
+    display: flex; align-items: center; gap: .75rem;
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: 10px; padding: .75rem 1rem; transition: border-color .2s;
+  }
+  .app-item:hover { border-color: var(--border); }
+  .app-icon { font-size: 1.3rem; width: 32px; height: 32px; display:flex; align-items:center; justify-content:center; }
+  .app-info { flex: 1; min-width: 0; }
+  .app-name { font-size: .9rem; font-weight: 500; }
+  .app-url  { font-size: .75rem; color: var(--accent); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app-arrow { color: var(--muted); text-decoration: none; font-size: 1rem; padding: .2rem .5rem; }
+  .app-arrow:hover { color: var(--accent); }
+
+  /* Scheduler */
+  .scheduler-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .75rem; margin: 1rem 0; }
+  .sched-cell {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 1.25rem; text-align: center;
+  }
+  .sched-num  { font-size: 2rem; font-weight: 700; font-family: var(--font-mono); }
+  .sched-num.warn { color: var(--yellow); }
+  .sched-num.ok   { color: var(--green); }
+  .sched-label { font-size: .68rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-top: .25rem; }
+  .sched-footer { display: flex; align-items: center; justify-content: space-between; margin-top: .75rem; font-size: .8rem; color: var(--muted); }
+
+  /* Users table */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: .7rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+  td { padding: .75rem .75rem; border-bottom: 1px solid var(--border2); font-size: .88rem; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  .td-actions { display: flex; gap: .5rem; justify-content: flex-end; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    z-index: 100; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1.75rem; width: 100%; max-width: 440px;
+  }
+  .modal h3 { font-size: 1rem; margin-bottom: 1.25rem; }
+  .modal-footer { display: flex; gap: .75rem; justify-content: flex-end; margin-top: 1.25rem; }
+  .btn-cancel {
+    padding: .55rem 1.1rem; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--card); color: var(--muted); font-size: .85rem; cursor: pointer;
+  }
+  .btn-cancel:hover { color: var(--text); }
+  .btn-submit {
+    padding: .55rem 1.25rem; border-radius: 8px; border: none;
+    background: linear-gradient(135deg,#2563eb,#7c3aed); color: #fff;
+    font-size: .85rem; font-weight: 600; cursor: pointer;
+  }
+  .btn-submit:hover { opacity: .85; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: .75rem 1.25rem; font-size: .85rem;
+    transform: translateY(80px); opacity: 0; transition: all .3s; pointer-events: none;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-color: rgba(34,197,94,.4); color: var(--green); }
+  #toast.error   { border-color: rgba(239,68,68,.4); color: var(--red); }
+
+  /* Spinner */
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .section-label { font-size: .7rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: .75rem; display:flex; align-items:center; gap:.5rem; }
+
+  .empty-state { text-align:center; padding: 2rem; color: var(--muted); font-size: .85rem; }
+
+  @media (max-width: 600px) {
+    header { padding: .75rem 1rem; }
+    nav    { padding: .75rem 1rem; }
+    main   { padding: 1rem; }
+    .info-grid { grid-template-columns: 1fr; }
+    .scheduler-grid { grid-template-columns: 1fr 1fr 1fr; }
+    .btn-row { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Login ─────────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-text">
+        <h1>EC2 Control</h1>
+        <p>Instance Manager</p>
+      </div>
+    </div>
+    <h2>Sign in</h2>
+    <p class="sub">Authenticate to manage your EC2 instances</p>
+    <div class="field"><label>Email address</label><input id="l-email" type="email" placeholder="you@example.com" autocomplete="email"/></div>
+    <div class="field"><label>Password</label><input id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
+    <button class="btn-primary" onclick="doLogin()">Sign in</button>
+    <div class="login-error" id="l-err"></div>
+  </div>
+</div>
+
+<!-- ── App ───────────────────────────────────────────────────────────── -->
+<div id="app">
+  <header>
+    <div class="header-logo">
+      <div class="logo-icon-sm">⚡</div>
+      <div class="logo-text">
+        <h1 style="font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;">EC2 Control</h1>
+        <p style="font-size:.65rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;">Instance Manager</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="user-pill">
+        <div class="user-dot"></div>
+        <span id="hdr-user">—</span>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">↪ logout</button>
+    </div>
+  </header>
+
+  <nav>
+    <button class="tab active" onclick="switchTab('instance')"  id="tab-instance">⚡ Instance</button>
+    <button class="tab"        onclick="switchTab('scheduler')" id="tab-scheduler">⏱ Scheduler</button>
+    <button class="tab"        onclick="switchTab('users')"     id="tab-users">👥 Users</button>
+  </nav>
+
+  <main>
+
+    <!-- ── Instance Tab ─── -->
+    <div id="pane-instance">
+
+      <div class="instance-selector">
+        <select id="inst-select" onchange="onInstanceChange()">
+          <option value="">— Select an instance —</option>
+        </select>
+        <button class="btn-sm accent" onclick="openAddInstance()">+ Add Instance</button>
+      </div>
+
+      <div id="inst-card" class="card" style="display:none">
+        <div class="card-header">
+          <div>
+            <div class="card-title" id="inst-name">—</div>
+            <div style="font-size:.78rem;color:var(--muted);font-family:var(--font-mono);margin-top:.2rem;" id="inst-id">—</div>
+          </div>
+          <span class="badge badge-loading" id="inst-state">Loading…</span>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-cell"><div class="info-label">Public IP</div><div class="info-value" id="inst-pubip">—</div></div>
+          <div class="info-cell"><div class="info-label">Private IP</div><div class="info-value" id="inst-privip">—</div></div>
+          <div class="info-cell"><div class="info-label">Instance Type</div><div class="info-value" id="inst-type">—</div></div>
+          <div class="info-cell"><div class="info-label">Launch Time</div><div class="info-value" id="inst-launch">—</div></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn-action btn-start" id="btn-start" onclick="doStart()">▶ Start Instance</button>
+          <button class="btn-action btn-stop"  id="btn-stop"  onclick="doStop()">■ Stop Instance</button>
+        </div>
+
+        <div class="refresh-row">
+          <button class="btn-refresh" onclick="refreshStatus()">↻ Refresh</button>
+          <span class="updated-at" id="inst-updated"></span>
+          <button class="btn-sm danger" id="btn-del-inst" style="margin-left:.5rem;display:none;" onclick="doDeleteInstance()">Remove</button>
+        </div>
+
+        <!-- Apps -->
+        <div style="margin-top:1.5rem;">
+          <div class="section-label">🔗 Applications on this instance
+            <button class="btn-sm" id="btn-add-app" style="display:none;margin-left:auto;" onclick="openAddApp()">+ Add App</button>
+          </div>
+          <div class="apps-list" id="apps-list"></div>
+        </div>
+      </div>
+
+      <div id="inst-empty" class="card" style="text-align:center;padding:2.5rem;">
+        <div style="font-size:2rem;margin-bottom:.75rem;">⚡</div>
+        <div style="color:var(--muted);font-size:.9rem;">Select an instance above or add one to get started.</div>
+      </div>
+    </div>
+
+    <!-- ── Scheduler Tab ─── -->
+    <div id="pane-scheduler" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⚙ Idle Auto-Shutdown</div>
+          <div style="display:flex;align-items:center;gap:.75rem;">
+            <span class="badge badge-enabled" id="sched-badge">Enabled</span>
+            <button class="btn-sm" id="btn-toggle-sched" onclick="toggleScheduler()">Disable</button>
+          </div>
+        </div>
+        <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem;line-height:1.6;">
+          Automatically stops all instances after the idle limit with no activity.
+          Activity resets on login, refresh, or any instance action.
+        </p>
+
+        <div class="scheduler-grid">
+          <div class="sched-cell">
+            <div class="sched-num" id="s-idle">—</div>
+            <div class="sched-label">Idle (min)</div>
+          </div>
+          <div class="sched-cell">
+            <div class="sched-num" id="s-limit">30</div>
+            <div class="sched-label">Limit (min)</div>
+          </div>
+          <div class="sched-cell">
+            <div class="sched-num warn" id="s-remaining">—</div>
+            <div class="sched-label">Remaining</div>
+          </div>
+        </div>
+
+        <div class="sched-footer">
+          <span>Last activity: <span id="s-last" style="font-family:var(--font-mono)">—</span></span>
+          <div style="display:flex;gap:.75rem;align-items:center;">
+            <button class="btn-sm" id="btn-edit-limit" onclick="openEditLimit()" style="display:none;">✏ Edit Limit</button>
+            <button class="btn-sm green-btn" onclick="resetTimer()">🖐 Reset timer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Users Tab ─── -->
+    <div id="pane-users" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">👥 User Management</div>
+          <button class="btn-sm accent" onclick="openAddUser()">+ Add User</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Role</th><th>Created</th><th></th></tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="5" class="empty-state">Loading users…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── Modals ─────────────────────────────────────────────────────────── -->
+
+<!-- Add Instance -->
+<div class="modal-overlay" id="modal-add-instance">
+  <div class="modal">
+    <h3>➕ Add EC2 Instance</h3>
+    <div class="field"><label>Display Name</label><input id="ai-name" placeholder="Prompt-Demo"/></div>
+    <div class="field"><label>Instance ID</label><input id="ai-id" placeholder="i-0abcdef1234567890" style="font-family:var(--font-mono)"/></div>
+    <div class="field"><label>AWS Region</label>
+      <select id="ai-region">
+        <option value="us-east-1">us-east-1 (N. Virginia)</option>
+        <option value="us-east-2">us-east-2 (Ohio)</option>
+        <option value="us-west-1">us-west-1 (N. California)</option>
+        <option value="us-west-2" selected>us-west-2 (Oregon)</option>
+        <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+        <option value="ap-southeast-2">ap-southeast-2 (Sydney)</option>
+        <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+        <option value="eu-west-1">eu-west-1 (Ireland)</option>
+        <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-add-instance')">Cancel</button>
+      <button class="btn-submit" onclick="submitAddInstance()">Add Instance</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add App -->
+<div class="modal-overlay" id="modal-add-app">
+  <div class="modal">
+    <h3>🔗 Add Application Link</h3>
+    <div class="field"><label>App Name</label><input id="ap-name" placeholder="Prompt Security"/></div>
+    <div class="field"><label>URL</label><input id="ap-url" placeholder="http://1.2.3.4:8501" style="font-family:var(--font-mono)"/></div>
+    <div class="field"><label>Icon (emoji)</label><input id="ap-icon" placeholder="🛡️" maxlength="4"/></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-add-app')">Cancel</button>
+      <button class="btn-submit" onclick="submitAddApp()">Add App</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add User -->
+<div class="modal-overlay" id="modal-add-user">
+  <div class="modal">
+    <h3>👤 Add User</h3>
+    <div class="field"><label>Full Name</label><input id="u-name" placeholder="Jane Smith"/></div>
+    <div class="field"><label>Email</label><input id="u-email" type="email" placeholder="jane@example.com"/></div>
+    <div class="field"><label>Password</label><input id="u-pass" type="password" placeholder="••••••••"/></div>
+    <div class="field"><label>Role</label>
+      <select id="u-role"><option value="user">User</option><option value="admin">Admin</option></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-add-user')">Cancel</button>
+      <button class="btn-submit" onclick="submitAddUser()">Create User</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Scheduler Limit -->
+<div class="modal-overlay" id="modal-edit-limit">
+  <div class="modal">
+    <h3>⏱ Edit Idle Limit</h3>
+    <div class="field"><label>Limit (minutes)</label><input id="el-limit" type="number" min="1" max="480" value="30"/></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-edit-limit')">Cancel</button>
+      <button class="btn-submit" onclick="submitEditLimit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────
+let currentUser    = null;
+let instances      = [];
+let selectedInstId = null; // db id
+let schedulerPoll  = null;
+let instPoll       = null;
+
+// ── Toast ────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/auth/me');
+    if (r.ok) {
+      const d = await r.json();
+      showApp(d.user);
+    } else {
+      showLogin();
+    }
+  } catch { showLogin(); }
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function showApp(user) {
+  currentUser = user;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('hdr-user').textContent = user.name;
+  // Admin-only elements
+  document.querySelectorAll('#btn-del-inst, #btn-add-app, #btn-edit-limit').forEach(el => {
+    el.style.display = user.role === 'admin' ? '' : 'none';
+  });
+  loadInstances();
+  switchTab('instance');
+}
+
+async function doLogin() {
+  const email = document.getElementById('l-email').value;
+  const pass  = document.getElementById('l-pass').value;
+  document.getElementById('l-err').textContent = '';
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password: pass })
+    });
+    const d = await r.json();
+    if (!r.ok) { document.getElementById('l-err').textContent = d.error; return; }
+    showApp(d.user);
+  } catch { document.getElementById('l-err').textContent = 'Connection error'; }
+}
+
+document.getElementById('l-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+async function doLogout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  currentUser = null;
+  instances = [];
+  selectedInstId = null;
+  clearInterval(instPoll);
+  clearInterval(schedulerPoll);
+  showLogin();
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  ['instance','scheduler','users'].forEach(t => {
+    document.getElementById('pane-' + t).style.display = t === name ? '' : 'none';
+    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+  });
+  clearInterval(instPoll);
+  clearInterval(schedulerPoll);
+  if (name === 'instance')  { if (selectedInstId) { refreshStatus(); instPoll = setInterval(refreshStatus, 30000); } }
+  if (name === 'scheduler') { loadScheduler(); schedulerPoll = setInterval(loadScheduler, 10000); }
+  if (name === 'users')     loadUsers();
+}
+
+// ── Instances ─────────────────────────────────────────────────────────────
+async function loadInstances() {
+  const r = await fetch('/api/instances');
+  if (!r.ok) return;
+  instances = await r.json();
+  const sel = document.getElementById('inst-select');
+  sel.innerHTML = '<option value="">— Select an instance —</option>';
+  instances.forEach(i => {
+    const o = document.createElement('option');
+    o.value = i.id; o.textContent = `${i.name}  (${i.instance_id})`;
+    sel.appendChild(o);
+  });
+  if (instances.length === 1) { sel.value = instances[0].id; onInstanceChange(); }
+}
+
+function onInstanceChange() {
+  const v = document.getElementById('inst-select').value;
+  selectedInstId = v || null;
+  clearInterval(instPoll);
+  if (!selectedInstId) {
+    document.getElementById('inst-card').style.display = 'none';
+    document.getElementById('inst-empty').style.display = '';
+    return;
+  }
+  document.getElementById('inst-card').style.display = '';
+  document.getElementById('inst-empty').style.display = 'none';
+  refreshStatus();
+  instPoll = setInterval(refreshStatus, 30000);
+}
+
+async function refreshStatus() {
+  if (!selectedInstId) return;
+  try {
+    const r = await fetch(`/api/instances/${selectedInstId}/status`);
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'AWS error', 'error'); return; }
+    renderInstance(d);
+    loadApps();
+  } catch(e) { toast('Network error', 'error'); }
+}
+
+function renderInstance(d) {
+  document.getElementById('inst-name').textContent   = d.name;
+  document.getElementById('inst-id').textContent     = d.instanceId;
+  document.getElementById('inst-pubip').textContent  = d.publicIp  || '—';
+  document.getElementById('inst-privip').textContent = d.privateIp || '—';
+  document.getElementById('inst-type').textContent   = d.instanceType || '—';
+  document.getElementById('inst-launch').textContent = d.launchTime ? new Date(d.launchTime).toLocaleString() : '—';
+  document.getElementById('inst-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+  const state = d.state || 'unknown';
+  const badge = document.getElementById('inst-state');
+  badge.textContent = state.toUpperCase();
+  badge.className = 'badge badge-' + (state === 'running' ? 'running' : state === 'stopped' ? 'stopped' : 'pending');
+
+  const running = state === 'running';
+  const stopped = state === 'stopped';
+  document.getElementById('btn-start').disabled = !stopped;
+  document.getElementById('btn-stop').disabled  = !running;
+}
+
+async function doStart() {
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-start').textContent = '⏳ Starting…';
+  const r = await fetch(`/api/instances/${selectedInstId}/start`, { method: 'POST' });
+  const d = await r.json();
+  document.getElementById('btn-start').textContent = '▶ Start Instance';
+  if (!r.ok) { toast(d.error, 'error'); return; }
+  toast('Instance starting…');
+  setTimeout(refreshStatus, 4000);
+}
+
+async function doStop() {
+  if (!confirm('Stop this instance?')) return;
+  document.getElementById('btn-stop').disabled = true;
+  document.getElementById('btn-stop').textContent = '⏳ Stopping…';
+  const r = await fetch(`/api/instances/${selectedInstId}/stop`, { method: 'POST' });
+  const d = await r.json();
+  document.getElementById('btn-stop').textContent = '■ Stop Instance';
+  if (!r.ok) { toast(d.error, 'error'); return; }
+  toast('Instance stopping…');
+  setTimeout(refreshStatus, 4000);
+}
+
+// ── Add Instance modal ────────────────────────────────────────────────────
+function openAddInstance() { openModal('modal-add-instance'); }
+
+async function submitAddInstance() {
+  const name   = document.getElementById('ai-name').value.trim();
+  const instId = document.getElementById('ai-id').value.trim();
+  const region = document.getElementById('ai-region').value;
+  if (!name || !instId) { toast('Name and Instance ID required', 'error'); return; }
+  const r = await fetch('/api/instances', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name, instance_id: instId, region })
+  });
+  const d = await r.json();
+  if (!r.ok) { toast(d.error, 'error'); return; }
+  closeModal('modal-add-instance');
+  document.getElementById('ai-name').value = '';
+  document.getElementById('ai-id').value = '';
+  toast('Instance added');
+  await loadInstances();
+  document.getElementById('inst-select').value = d.id;
+  onInstanceChange();
+}
+
+async function doDeleteInstance() {
+  if (!confirm('Remove this instance from the panel? (AWS instance is NOT terminated)')) return;
+  await fetch(`/api/instances/${selectedInstId}`, { method: 'DELETE' });
+  selectedInstId = null;
+  toast('Instance removed');
+  await loadInstances();
+  document.getElementById('inst-card').style.display = 'none';
+  document.getElementById('inst-empty').style.display = '';
+}
+
+// ── Apps ──────────────────────────────────────────────────────────────────
+async function loadApps() {
+  if (!selectedInstId) return;
+  const r = await fetch(`/api/instances/${selectedInstId}/apps`);
+  if (!r.ok) return;
+  const apps = await r.json();
+  const list = document.getElementById('apps-list');
+  if (!apps.length) { list.innerHTML = '<div class="empty-state" style="text-align:left;padding:.75rem 0;">No applications added yet.</div>'; return; }
+  list.innerHTML = apps.map(a => `
+    <div class="app-item">
+      <div class="app-icon">${a.icon}</div>
+      <div class="app-info">
+        <div class="app-name">${escHtml(a.name)}</div>
+        <div class="app-url">${escHtml(a.url)}</div>
+      </div>
+      <a href="${escHtml(a.url)}" target="_blank" rel="noopener" class="app-arrow">→</a>
+      ${currentUser?.role==='admin' ? `<button class="btn-sm danger" onclick="deleteApp(${a.id})">✕</button>` : ''}
+    </div>
+  `).join('');
+}
+
+function openAddApp() { openModal('modal-add-app'); }
+
+async function submitAddApp() {
+  const name = document.getElementById('ap-name').value.trim();
+  const url  = document.getElementById('ap-url').value.trim();
+  const icon = document.getElementById('ap-icon').value.trim() || '🔗';
+  if (!name || !url) { toast('Name and URL required', 'error'); return; }
+  const r = await fetch(`/api/instances/${selectedInstId}/apps`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name, url, icon })
+  });
+  const d = await r.json();
+  if (!r.ok) { toast(d.error, 'error'); return; }
+  closeModal('modal-add-app');
+  document.getElementById('ap-name').value = '';
+  document.getElementById('ap-url').value = '';
+  document.getElementById('ap-icon').value = '';
+  toast('App added');
+  loadApps();
+}
+
+async function deleteApp(appId) {
+  if (!confirm('Remove this app link?')) return;
+  await fetch(`/api/instances/${selectedInstId}/apps/${appId}`, { method: 'DELETE' });
+  toast('App removed');
+  loadApps();
+}
+
+// ── Scheduler ─────────────────────────────────────────────────────────────
+async function loadScheduler() {
+  const r = await fetch('/api/scheduler');
+  if (!r.ok) return;
+  const d = await r.json();
+  document.getElementById('s-idle').textContent      = d.idleMinutes;
+  document.getElementById('s-limit').textContent     = d.limitMinutes;
+  const rem = d.remainingMinutes;
+  const remEl = document.getElementById('s-remaining');
+  remEl.textContent = rem + ' min';
+  remEl.className = 'sched-num ' + (rem <= 5 ? 'warn' : 'ok');
+  document.getElementById('s-last').textContent = d.lastActivity
+    ? new Date(d.lastActivity + 'Z').toLocaleString() : '—';
+
+  const badge = document.getElementById('sched-badge');
+  const btn   = document.getElementById('btn-toggle-sched');
+  if (d.enabled) {
+    badge.textContent = 'Enabled'; badge.className = 'badge badge-enabled';
+    btn.textContent = 'Disable';
+  } else {
+    badge.textContent = 'Disabled'; badge.className = 'badge badge-disabled';
+    btn.textContent = 'Enable';
+  }
+  document.getElementById('el-limit').value = d.limitMinutes;
+}
+
+async function toggleScheduler() {
+  const badge = document.getElementById('sched-badge');
+  const enabled = badge.textContent === 'Enabled';
+  await fetch('/api/scheduler', {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ enabled: !enabled })
+  });
+  loadScheduler();
+  toast(enabled ? 'Scheduler disabled' : 'Scheduler enabled');
+}
+
+async function resetTimer() {
+  await fetch('/api/scheduler/reset', { method: 'POST' });
+  toast('Timer reset');
+  loadScheduler();
+}
+
+function openEditLimit() { openModal('modal-edit-limit'); }
+async function submitEditLimit() {
+  const v = parseInt(document.getElementById('el-limit').value);
+  if (!v || v < 1) { toast('Enter a valid number', 'error'); return; }
+  await fetch('/api/scheduler', {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ limit_minutes: v })
+  });
+  closeModal('modal-edit-limit');
+  toast('Limit updated');
+  loadScheduler();
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────
+async function loadUsers() {
+  const r = await fetch('/api/users');
+  if (!r.ok) { document.getElementById('users-tbody').innerHTML = '<tr><td colspan="5" class="empty-state">No access</td></tr>'; return; }
+  const users = await r.json();
+  document.getElementById('users-tbody').innerHTML = users.map(u => `
+    <tr>
+      <td>${escHtml(u.name)}</td>
+      <td style="font-family:var(--font-mono);font-size:.8rem;">${escHtml(u.email)}</td>
+      <td><span class="badge badge-${u.role}">${u.role.toUpperCase()}</span></td>
+      <td style="color:var(--muted);">${fmtDate(u.created_at)}</td>
+      <td>
+        <div class="td-actions">
+          ${u.id !== currentUser?.id ? `
+            <button class="btn-sm" onclick="toggleUserRole(${u.id}, '${u.role}')">
+              → ${u.role === 'admin' ? 'User' : 'Admin'}
+            </button>
+            <button class="btn-sm danger" onclick="deleteUser(${u.id})">Delete</button>
+          ` : '<span style="color:var(--muted);font-size:.78rem;">(you)</span>'}
+        </div>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="empty-state">No users</td></tr>';
+}
+
+function openAddUser() { openModal('modal-add-user'); }
+
+async function submitAddUser() {
+  const name  = document.getElementById('u-name').value.trim();
+  const email = document.getElementById('u-email').value.trim();
+  const pass  = document.getElementById('u-pass').value;
+  const role  = document.getElementById('u-role').value;
+  if (!name || !email || !pass) { toast('All fields required', 'error'); return; }
+  const r = await fetch('/api/users', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name, email, password: pass, role })
+  });
+  const d = await r.json();
+  if (!r.ok) { toast(d.error, 'error'); return; }
+  closeModal('modal-add-user');
+  ['u-name','u-email','u-pass'].forEach(id => document.getElementById(id).value = '');
+  toast('User created');
+  loadUsers();
+}
+
+async function toggleUserRole(id, currentRole) {
+  const newRole = currentRole === 'admin' ? 'user' : 'admin';
+  const r = await fetch(`/api/users/${id}/role`, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ role: newRole })
+  });
+  const d = await r.json();
+  if (!r.ok) { toast(d.error, 'error'); return; }
+  toast(`Role changed to ${newRole}`);
+  loadUsers();
+}
+
+async function deleteUser(id) {
+  if (!confirm('Delete this user?')) return;
+  await fetch(`/api/users/${id}`, { method: 'DELETE' });
+  toast('User deleted');
+  loadUsers();
+}
+
+// ── Modal helpers ─────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ── Util ──────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s.includes('T') ? s : s + 'Z');
+  return d.toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' }).replace(/\//g,'/');
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+checkAuth();
+</script>
+</body>
+</html>

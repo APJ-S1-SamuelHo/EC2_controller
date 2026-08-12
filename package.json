@@ -1,0 +1,17 @@
+{
+  "name": "ec2-control-panel",
+  "version": "2.0.0",
+  "description": "EC2 Instance Control Panel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.600.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^9.4.3",
+    "connect-sqlite3": "^0.9.15",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0"
+  }
+}
