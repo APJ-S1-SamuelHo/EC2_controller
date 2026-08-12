@@ -463,6 +463,7 @@
     <div class="field"><label>App Name</label><input id="ap-name" placeholder="Prompt Security"/></div>
     <div class="field"><label>Public IP</label><input id="ap-ip" style="font-family:var(--font-mono)" placeholder="Auto-filled from instance"/></div>
     <div class="field"><label>Port</label><input id="ap-port" type="number" placeholder="e.g. 8501" min="1" max="65535" style="font-family:var(--font-mono)"/></div>
+    <div class="field"><label>Path <span style="color:var(--muted);font-weight:400;">(optional, e.g. /admin)</span></label><input id="ap-path" style="font-family:var(--font-mono)" placeholder="/admin"/></div>
     <div class="field"><label>Icon (emoji)</label><input id="ap-icon" placeholder="🛡️" maxlength="4"/></div>
     <div style="font-size:.78rem;color:var(--muted);margin-bottom:.75rem;">
       URL preview: <span id="ap-url-preview" style="font-family:var(--font-mono);color:var(--accent)">—</span>
@@ -736,32 +737,39 @@ async function loadApps() {
 function updateAppUrlPreview() {
   const ip   = document.getElementById('ap-ip').value.trim();
   const port = document.getElementById('ap-port').value.trim();
+  const path = document.getElementById('ap-path').value.trim();
   const prev = document.getElementById('ap-url-preview');
-  prev.textContent = ip && port ? `http://${ip}:${port}` : '—';
+  if (!ip || !port) { prev.textContent = '—'; return; }
+  const safePath = path ? (path.startsWith('/') ? path : '/' + path) : '';
+  prev.textContent = `http://${ip}:${port}${safePath}`;
 }
 
 function openAddApp() {
-  document.getElementById('ap-ip').value   = currentPublicIp || '';
+  // Use currentPublicIp, fall back to whatever is shown in the instance card
+  const ip = currentPublicIp || document.getElementById('inst-pubip').textContent.trim().replace('—','');
+  document.getElementById('ap-ip').value   = ip;
   document.getElementById('ap-port').value = '';
+  document.getElementById('ap-path').value = '';
   document.getElementById('ap-name').value = '';
   document.getElementById('ap-icon').value = '';
   updateAppUrlPreview();
   openModal('modal-add-app');
 }
 
-// Live preview as user types
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('ap-ip').addEventListener('input', updateAppUrlPreview);
-  document.getElementById('ap-port').addEventListener('input', updateAppUrlPreview);
-});
+// Live preview — attach directly (DOM is ready at script execution time)
+document.getElementById('ap-ip').addEventListener('input', updateAppUrlPreview);
+document.getElementById('ap-port').addEventListener('input', updateAppUrlPreview);
+document.getElementById('ap-path').addEventListener('input', updateAppUrlPreview);
 
 async function submitAddApp() {
   const name = document.getElementById('ap-name').value.trim();
-  const ip   = document.getElementById('ap-ip').value.trim();
+  const ip   = document.getElementById('ap-ip').value.trim() || currentPublicIp;
   const port = document.getElementById('ap-port').value.trim();
+  const path = document.getElementById('ap-path').value.trim();
   const icon = document.getElementById('ap-icon').value.trim() || '🔗';
   if (!name || !ip || !port) { toast('Name, IP and Port required', 'error'); return; }
-  const url = `http://${ip}:${port}`;
+  const safePath = path ? (path.startsWith('/') ? path : '/' + path) : '';
+  const url = `http://${ip}:${port}${safePath}`;
   const r = await fetch(`/api/instances/${selectedInstId}/apps`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ name, url, icon })
@@ -771,6 +779,7 @@ async function submitAddApp() {
   closeModal('modal-add-app');
   document.getElementById('ap-name').value = '';
   document.getElementById('ap-port').value = '';
+  document.getElementById('ap-path').value = '';
   document.getElementById('ap-icon').value = '';
   toast('App added');
   loadApps();
