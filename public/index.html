@@ -714,6 +714,12 @@ async function doDeleteInstance() {
 }
 
 // ── Apps ──────────────────────────────────────────────────────────────────
+function resolveAppUrl(url) {
+  // Replace {ip} placeholder with current live public IP
+  if (!url) return url;
+  return url.replace('{ip}', currentPublicIp || '{ip}');
+}
+
 async function loadApps() {
   if (!selectedInstId) return;
   const r = await fetch(`/api/instances/${selectedInstId}/apps`);
@@ -721,21 +727,24 @@ async function loadApps() {
   const apps = await r.json();
   const list = document.getElementById('apps-list');
   if (!apps.length) { list.innerHTML = '<div class="empty-state" style="text-align:left;padding:.75rem 0;">No applications added yet.</div>'; return; }
-  list.innerHTML = apps.map(a => `
+  list.innerHTML = apps.map(a => {
+    const resolvedUrl = resolveAppUrl(a.url);
+    const isDynamic = a.url.includes('{ip}');
+    return `
     <div class="app-item">
       <div class="app-icon">${a.icon}</div>
       <div class="app-info">
-        <div class="app-name">${escHtml(a.name)}</div>
-        <div class="app-url">${escHtml(a.url)}</div>
+        <div class="app-name">${escHtml(a.name)}${isDynamic ? ' <span style="font-size:.65rem;color:var(--accent);opacity:.7;" title="URL updates automatically with instance IP">⚡ dynamic</span>' : ''}</div>
+        <div class="app-url">${escHtml(resolvedUrl)}</div>
       </div>
-      <a href="${escHtml(a.url)}" target="_blank" rel="noopener" class="app-arrow">→</a>
+      <a href="${escHtml(resolvedUrl)}" target="_blank" rel="noopener" class="app-arrow">→</a>
       ${currentUser?.role==='admin' ? `<button class="btn-sm danger" onclick="deleteApp(${a.id})">✕</button>` : ''}
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function updateAppUrlPreview() {
-  const ip   = document.getElementById('ap-ip').value.trim();
+  const ip   = document.getElementById('ap-ip').value.trim() || currentPublicIp || '';
   const port = document.getElementById('ap-port').value.trim();
   const path = document.getElementById('ap-path').value.trim();
   const prev = document.getElementById('ap-url-preview');
@@ -769,7 +778,8 @@ async function submitAddApp() {
   const icon = document.getElementById('ap-icon').value.trim() || '🔗';
   if (!name || !ip || !port) { toast('Name, IP and Port required', 'error'); return; }
   const safePath = path ? (path.startsWith('/') ? path : '/' + path) : '';
-  const url = `http://${ip}:${port}${safePath}`;
+  // Store {ip} as placeholder so URL updates automatically when instance IP changes
+  const url = `http://{ip}:${port}${safePath}`;
   const r = await fetch(`/api/instances/${selectedInstId}/apps`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ name, url, icon })
